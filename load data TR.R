@@ -75,6 +75,9 @@ json_all_dframe <- rbind(json_all_dframe[,keep.columns],json_dframe_16[,keep.col
 # Remove individual dataframes
 rm(list=rm(list = ls(pattern = "^json_dframe")))
 
+# Export a list of company numbers and names to have for later
+write.csv(json_all_dframe[,c(1,3,4)],"PSC_companies_ppl.csv", row.names = FALSE)
+
 ########################YOU NOW HAVE A MERGED PSC FILE!!! ##################################
 
 
