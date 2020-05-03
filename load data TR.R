@@ -44,11 +44,6 @@ json_dframe_14 <- flatten(json_dframe_14, recursive = T)
 json_dframe_15 <- flatten(json_dframe_15, recursive = T)
 json_dframe_16 <- flatten(json_dframe_16, recursive = T)
 
-# Test the files out
-# View(head(json_dframe_2))
-# colnames(json_dframe_2)
-# colnames(json_dframe_1)
-# dim(json_dframe_2)
 
 # Choose columns to retain in merge and Add non-existent columns to 16th file
 keep.columns <- colnames(json_dframe_1)[c(1,3,5:8, 10:17,19:20, 23:25)]
@@ -78,18 +73,6 @@ rm(list=rm(list = ls(pattern = "^json_dframe")))
 # Export a list of company numbers and names to have for later
 write.csv(json_all_dframe[,c(1,3,4)],"PSC_companies_ppl.csv", row.names = FALSE)
 
-########################YOU NOW HAVE A MERGED PSC FILE!!! ##################################
-
-
-## Run some stats
-
-# Check out data set
-# dim(json_all_dframe)
-# View(head(json_all_dframe))
-
-# Run some stats
-View(unique(json_all_dframe$data.notified_on))
-View(unique(json_all_dframe$data.natures_of_control))
 
 
 ### Import the company data and merge
@@ -115,9 +98,32 @@ Data.company_info <- Data.company_info[,keep.columns.company]
 # View(head(test))
 # rm(test)
 
+
+## Just Merge a few columns
+Data.company_info <- Data.company_info[,c(1,2,9,27)]
+json_all_dframe <- json_all_dframe[,c(1:6, 16)]
+
+
 # Actual merge
 Data.PSC.merged <- merge(json_all_dframe, Data.company_info, by.x = "company_number", by.y = "CompanyNumber", all.x = TRUE)
 # Note - this does not pull in PSCs for companies not in the companies file - not enough memory for operation
+
+
+# Remove the excess files
+rm(json_all_dframe)
+rm(Data.company_info)
+
+## Export a file for later
+write.csv(Data.PSC.merged[,c(1:5,7:10)],"PSC_Merged_Data.csv", row.names = FALSE)
+
+
+########################YOU NOW HAVE A MERGED PSC FILE!!! ##################################
+
+
+
+
+
+
 
 ## Check - how many companies in free product but not in PSC file?
 
@@ -130,10 +136,10 @@ Data.PSC.merged <- merge(json_all_dframe, Data.company_info, by.x = "company_num
 PSC.unique_companies <- length(unique(json_all_dframe$company_number))
 
 # How many unique company ids in merged dataset?
-Merge.unique_companies <- length(unique(Data.PSC.merged$company_number))
+Product.unique_companies <- length(unique(Data.company_info$CompanyNumber))
 
 # How many companies matched to PSC file? - about 77% of PSC-company rows
-Merge.unique_companies/PSC.unique_companies
+Product.unique_companies/PSC.unique_companies
 
 
 ## Anything specific about the companies that didn't match that might matter?
