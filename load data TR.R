@@ -4,6 +4,7 @@ setwd("C:/Users/Taran/Documents/Personal/Courses/MIT Final Pset")
 library("httr")
 library("readxl")
 library("jsonlite")
+library(dplyr)
 
 
 
@@ -75,7 +76,7 @@ write.csv(json_all_dframe[,c(1,3,4)],"PSC_companies_ppl.csv", row.names = FALSE)
 
 
 
-### Import the company data and merge
+################# Import the company data and merge #####################
 
 # Import file
 Data.company_info <- read.csv("BasicCompanyDataAsOneFile-2020-04-01.csv", header=TRUE)
@@ -86,6 +87,14 @@ keep.columns.company <- colnames(Data.company_info)[c(1:33)]
 # Keep those columns
 Data.company_info <- Data.company_info[,keep.columns.company]
 
+
+# Checking for matches
+Data.company_info$standardized <- tolower(noquote(Data.company_info$CompanyName))
+Data.company_info[charmatch("apex tool solutions",Data.company_info$standardized),]
+
+
+
+############### Merge PSC and company data ######################
 
 ## Merge with other data
 
@@ -120,6 +129,45 @@ write.csv(Data.PSC.merged[,c(1:5,7:10)],"PSC_Merged_Data.csv", row.names = FALSE
 ########################YOU NOW HAVE A MERGED PSC FILE!!! ##################################
 
 
+### Cheat for next few steps - just pull in the PSC merged csv from your computer and skip the above
+
+Data.PSC.merged <- read.csv("PSC_Merged_Data.csv")
+
+
+
+######## Examining Open Contracts Data ###################
+
+
+### Pull in and Merge digiwhist data
+
+# Start with digiwhist 2019 data - pull in whole folder later
+digiwhist_ot <- read.csv("digiwhist_open_tender.csv")
+#x <- digiwhist_ot_grouped %>% group_by(tender_id, tender_year, lot_status, bid_isWinning, bidder_id, bidder_name)
+
+
+# Reduce columns to those needed for merge (do analysis later)
+ot_columns <- colnames()
+
+# Match companies in PSC file to winners
+
+# try unedited
+Data.PSC.merged <- merge(Data.PSC.merged, digiwhist_ot, by.x = "CompanyName", by.y = "bidder_name", all.x = TRUE)
+
+
+#make all company names lowercase and match on stem
+
+
+
+### Pull in and Merge OCDS data
+
+# Did using power query - repull in power query file
+#uk_ocds_long <- read.csv("uk_ocds_long.csv", header = FALSE, sep = ",")
+
+
+
+
+
+######### Trying to analyze this data ################
 
 
 
@@ -185,10 +233,4 @@ table.industry_code <- table(Data.PSC.merged$SICCode.SicText_1)/length(Data.PSC.
 
 
 
-
-######## Examining Open Contracts Data ###################3
-
-validate("UK_ocds_data.json")
-f <- file("UK_ocds_data.json")
-ndjson::stream_in("UK_ocds_data.json")
 

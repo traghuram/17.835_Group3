@@ -1,0 +1,46 @@
+#Change directory
+cd C:\Users\Taran\Documents\Personal\Courses\
+cd '.\MIT Final pset\'
+
+
+### OCDS JSON scripts
+
+#One row per contract (w roles):
+jq --raw-output '{ocid: .releases[].ocid, name: [.releases[].parties[].name] | join(\";\"), role: [.releases[].parties[].roles[]] | join(\";\")} | [.ocid, .name, .role] | @csv' UK_ocds_data.json > uk_ocds_short.csv
+
+#One row per contract-entity combo:
+jq --raw-output '{ocid: .releases[].ocid, name: .releases[].parties[]} | {ocid: .ocid, name: .name.name, role: .name.roles[]} | [.ocid, .name, .role] | @csv' UK_ocds_data.json > uk_ocds_long.csv
+
+# Finding company ID and register its associated with when it exists
+.releases[] | .parties[] | .additionalIdentifiers
+
+# Extracting IDs - fail
+{contract_id: group_by(.uri) | .[] | .[] | .uri, name: group_by(.uri) | .[] | {release: .[0].releases} | .[] | .[] | .parties[] | .name, company_id: group_by(.uri) | .[] | {release: .[0].releases} | .[] | .[] | .parties[] | .additionalIdentifiers | .[0].id}
+
+# Extracting IDs for first org listed for each contract (likely buyer)
+{company_name: .[] | .releases[] | .parties[0] | .name, company_role: .[] | .releases[] | .parties[0] | .roles[], company_id: .[] | .releases[] | .parties[0] | .additionalIdentifiers[] | .id}
+
+# Extracting IDs for second company listed for each contracts
+jq --slurp --raw-output '{company_name: .[] | .releases[] | .parties[1] | .name, company_role: .[] | .releases[] | .parties[1] | .roles[], company_id: .[] | .releases[] | .parties[1] | .additionalIdentifiers[] | .id} | [.company_name, .company_role, .company_id] | @csv' UK_ocds_data.json > company_ids.csv
+
+
+
+
+
+
+### Digiwhist JSON scripts
+
+cd \digiwhist_ndjson
+
+# One row per contract winner - all awarded2019 contracts
+jq --raw-output '{tender_id: .persistentId, buyer: .buyers[] | .name, status: .lots[] | .status, winner: .lots[].bids[]?.bidders[].name} | [.tender_id, .buyer, .status, .winner] | @csv' data-uk-2019.ndjson > ot_winners_2019_json.csv
+
+# one row per contract - all announced 2019 contracts
+jq --raw-output '{tender_id: .persistentId, buyer: .buyers[] | .name, status: .lots[] | .status} | [.tender_id, .buyer, .status] | @csv' data-uk-2019.ndjson > ot_all_announced_2019_json.csv
+
+# one row per contract - all 2019 rows with buyers
+jq --raw-output '{tender_id: .persistentId, buyer: .buyers[] | .name} | [.tender_id, .buyer] | @csv' data-uk-2019.ndjson > ot_all_buyers_2019_json.csv
+
+# one row per contract - all 2019 rows
+jq --raw-output '{tender_id: .persistentId} | [.tender_id] | @csv' data-uk-2019.ndjson > ot_all_2019_json.csv
+jq --raw-output '{tender_id: .id, persistent_id: .persistentId} | [.tender_id, .persistent_id] | @csv' data-uk-2019.ndjson > ot_all_2019_json.csv
