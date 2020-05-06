@@ -1,57 +1,63 @@
 # -*- coding: utf-8 -*-
+"""
+Created on Sun Apr 19 17:51:06 2020
+
+@author: Taran
+"""
 
 import requests
 import os
 import pandas as pd
+
+file_path = os.chdir(r'C:\Users\Taran\Documents\Personal\Courses\MIT Final pset')
+
+
+'''
 import ijson
+import json
 import itertools
 import random
+'''
 
-os.chdir(r'C:\Users\Taran\Documents\Personal\Courses\MIT Final pset')
 
-
-filename = 'persons-with-significant-control-snapshot-2020-04-14.txt'     
+'''
+filename = 'UK_ocds_data.json'     
   
 basic_filename = 'BasicCompanyDataAsOneFile-2020-04-01.csv'
 
-### Method 1
-     
-n = sum(1 for line in open(basic_filename))-1  # Calculate number of rows in file
-s = n//10  # sample size of 10%
-skip = sorted(random.sample(range(1, n+1), n-s))  # n+1 to compensate for header 
-df = pd.read_csv(basic_filename, skiprows=skip)
 
+with open('UK_ocds_data.json', 'r') as myfile:
+    data=myfile.read()
 
+data = json.load(filename)
+'''
 
-##### Method 2
+### Requests from Company House
 
-# define the number of lines to read
-number_of_lines = 5
+url = 'https://api.companieshouse.gov.uk/company/08209948'
+key = 'ezzyL-AgcrjuATWDriXmVdZkKzr7fYgmDDSbJjrn'
+response = requests.get(url, auth=(key,''))
+response.status_code
 
-with open(filename, 'r') as input_file:
-    lines_cache = itertools.islice(input_file, number_of_lines)
-   
-    for current_line in lines_cache:
-        print (current_line)
+' Create a loop that pulls in records for companies that were not in basic file
 
+list_needed = pd.read_csv('unmerged_PSC_list.csv', dtype = 'str') #[list of companies that weren't in merge file
+json_list = []
 
+last = 4200
+new = 4800
 
-#### Method 3
+for idx, val in enumerate(list_needed['x'][last:new]):
+    
+    url = 'https://api.companieshouse.gov.uk/company/' + val
+    response = requests.get(url, auth=(key,''))
+    if (response.status_code != 200):
+        print(idx)
+        break
+    json_list.append(response.json())
+    
+    
         
-with open(filename, 'r') as f:
-    objects = ijson.items(f, 'company_number')
-    columns = list(objects)
-
-
-
-#### Company data product
-
-
-def get_API():
-    r = requests.get('https://api.companieshouse.gov.uk/company/00002065', auth=('xxxxxxxxxxxxxxxxxxxxxxxxxxx', ''))
-    print(r.text)
     
-    
-def load_data():
-    df = pd.read_json('persons-with-significant-control-snapshot-2020-04-14.txt')
-    return df
+
+

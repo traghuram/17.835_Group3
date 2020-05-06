@@ -89,8 +89,8 @@ Data.company_info <- Data.company_info[,keep.columns.company]
 
 
 # Checking for matches
-Data.company_info$standardized <- tolower(noquote(Data.company_info$CompanyName))
-Data.company_info[charmatch("apex tool solutions",Data.company_info$standardized),]
+#Data.company_info$standardized <- tolower(noquote(Data.company_info$CompanyName))
+#Data.company_info[charmatch("apex tool solutions",Data.company_info$standardized),]
 
 
 
