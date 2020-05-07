@@ -150,7 +150,7 @@ merged_basic_opentender <- merge(digiwhist_all, Data.company_info[,keep.columns.
                                  by.x = "CompanyNumber", by.y = "CompanyNumber", all.x = TRUE)
 
 
-
+######################## STOP HERE FOR A MERGED OPEN TENDER AND BASIC COMPANY FILE ########################3
 
 
 
@@ -276,6 +276,125 @@ Data.PSC.merged <- read.csv("PSC_Merged_Data.csv")
 
 
 ######### Trying to analyze these datasets ################
+
+
+### Open Tender Analysis ###
+
+## Understanding the tenders that the UK govt has put out
+
+# How many unique tenders over the last 10 years?
+length(unique(merged_basic_opentender$tender_id))
+
+# How many unique tenders by year?
+unique_tenders <- unique(merged_basic_opentender[,c("tender_id","tender_year")])
+aggregate(unique_tenders$tender_id, by = list(unique_tenders$tender_year), FUN = length)
+
+# How many unique tenders that were awarded by year?
+unique_tenders_awarded <- unique(merged_basic_opentender[merged_basic_opentender$lot_status == "AWARDED"
+                                                         & !is.na(merged_basic_opentender$bid_price),
+                                                         c("tender_id","tender_year", "bid_price", "lot_status")])
+
+aggregate(unique_tenders_awarded$bid_price, by = list(unique_tenders_awarded$tender_year), FUN = mean)
+
+# How many unique tenders that were awarded by winning bid amount?
+
+
+
+
+
+## How many companies can we identify that have bid on contracts?
+
+# Total unique bids
+length(unique(merged_basic_opentender$bidder_id))
+
+# Total unique bids tied to a company in basic companies dataset
+dim(unique(merged_basic_opentender[,c("bidder_id", "CompanyNumber")]))[1]
+
+# Total unique bids on awarded contracts tied to a company in basic companies dataset
+dim(unique(merged_basic_opentender[merged_basic_opentender$lot_status == "AWARDED",
+                                   c("bidder_id", "CompanyNumber")]))[1]
+
+# Total unique bids on unawarded contracts tied to a company in basic companies dataset
+dim(unique(merged_basic_opentender[merged_basic_opentender$lot_status != "AWARDED",
+                                   c("bidder_id", "CompanyNumber")]))[1]
+
+
+# Total unique bidders - 167k
+length(unique(merged_basic_opentender$bidder_name))
+
+# Total unique bidders tied to a company in basic companies dataset - 46k
+length(unique(merged_basic_opentender$CompanyNumber))
+
+# Total unique bidders on awarded contracts tied to a company in basic companies dataset - 46k
+length(unique(merged_basic_opentender[merged_basic_opentender$lot_status == "AWARDED","CompanyNumber"]))
+
+# Total unique bidders on unawarded contracts tied to a company in basic companies dataset - 166
+length(unique(merged_basic_opentender[merged_basic_opentender$lot_status != "AWARDED","CompanyNumber"]))
+
+# Total unique winners of bids on awarded contracts tied to a company in basic companies dataset - 46k
+length(unique(merged_basic_opentender[merged_basic_opentender$bid_isWinning == "yes","CompanyNumber"]))
+
+
+## What does the distribution of bids look like?
+
+# Total bids on tenders by lot status
+aggregate(merged_basic_opentender$lot_status, by = list(merged_basic_opentender$lot_status), FUN = length)
+
+# Average bid price by lot status
+aggregate(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price), "bid_price"],
+          by = list(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price), "lot_status"]), FUN = mean)
+
+# Distribution of winning bid prices
+# Smaller bids
+hist(merged_basic_opentender[merged_basic_opentender$bid_isWinning == "yes"
+                             & merged_basic_opentender$bid_price<1000000
+                             & !is.na(merged_basic_opentender$bid_price),"bid_price"],
+     main = "Frequency of winning bids by price (<1,000,000 Euros", xlab = "Winning Bid",
+     cex = 0.5)
+
+# Larger bids
+hist(merged_basic_opentender[merged_basic_opentender$bid_isWinning == "yes"
+                             & merged_basic_opentender$bid_price>100000000
+                             & !is.na(merged_basic_opentender$bid_price),"bid_price"],
+     main = "Frequency of winning bids by price (>100,000,000 Euros", xlab = "Winning Bid",
+     cex = 0.5)
+
+# What have been the largest winning bids in these records?
+View(merged_basic_opentender[merged_basic_opentender$bid_isWinning == "yes"
+                        & merged_basic_opentender$bid_price>100000000 
+                        & !is.na(merged_basic_opentender$bid_price),])
+
+# Who has won the largest bids in these records, and how large have they been?
+View(head(merged_basic_opentender[order(-merged_basic_opentender$bid_price),
+                                  c("bidder_name","CompanyName.x", "bid_price")],20))
+
+
+## What types of public contracts have been awarded in the last 10 or so years?
+
+# Most valuable awarded public contracts by winning company indusry
+industry_bids <- aggregate(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price), "bid_price"],
+          by = list(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price),
+                                            c("SICCode.SicText_1" )]), FUN = length)
+
+industry_bids$perc <- industry_bids$x/sum(industry_bids$x)*100
+#View(industry_bids[order(-industry_bids$x),])
+barplot(head(industry_bids[order(-industry_bids$perc),"perc"],15))
+head(industry_bids[order(-industry_bids$perc),],15)
+
+
+## How competitive have the bids been?
+
+# Distribution of awarded contracts by number of bids
+
+
+
+
+## What predicts who wins a bid among bidders? Age of company? Geography? Company wealth? 
+
+# Supervised way - OLS
+
+
+# Unsupervised way - LASSO or prcomp or k-means cluster of bid results and these features
 
 
 
