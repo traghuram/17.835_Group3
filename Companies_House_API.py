@@ -8,13 +8,14 @@ Created on Sun Apr 19 17:51:06 2020
 import requests
 import os
 import pandas as pd
+import json
+
 
 file_path = os.chdir(r'C:\Users\Taran\Documents\Personal\Courses\MIT Final pset')
 
 
 '''
 import ijson
-import json
 import itertools
 import random
 '''
@@ -44,8 +45,8 @@ response.status_code
 list_needed = pd.read_csv('unmerged_PSC_list.csv', dtype = 'str') #[list of companies that weren't in merge file
 json_list = []
 
-last = 4200
-new = 4800
+last = 0
+new = 12000
 
 for idx, val in enumerate(list_needed['x'][last:new]):
     
@@ -55,7 +56,8 @@ for idx, val in enumerate(list_needed['x'][last:new]):
         print(idx)
         break
     json_list.append(response.json())
-    
+
+
     
         
     

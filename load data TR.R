@@ -8,7 +8,155 @@ library(dplyr)
 
 
 
-######### Merging PSC and companies house datasets ##############
+
+
+################# Import the basic company data #####################
+
+# Import file
+Data.company_info <- read.csv("BasicCompanyDataAsOneFile-2020-04-01.csv", header=TRUE)
+
+# Define columns to keep
+keep.columns.company <- colnames(Data.company_info)[c(1:33)]
+
+# Keep those columns
+Data.company_info <- Data.company_info[,keep.columns.company]
+
+
+
+
+
+
+###################### Merging basic company data with Open Tender Data ###################
+
+
+## Read in all files (condense code later) - create a folder in your working directory and paste the files in there
+digiwhist_2009 <- read.csv("digiwhist_csv/data-uk-2009.csv", sep = ";", stringsAsFactors = FALSE)
+digiwhist_2010 <- read.csv("digiwhist_csv/data-uk-2010.csv", sep = ";", stringsAsFactors = FALSE)
+digiwhist_2011 <- read.csv("digiwhist_csv/data-uk-2011.csv", sep = ";", stringsAsFactors = FALSE)
+digiwhist_2012 <- read.csv("digiwhist_csv/data-uk-2012.csv", sep = ";", stringsAsFactors = FALSE)
+digiwhist_2013 <- read.csv("digiwhist_csv/data-uk-2013.csv", sep = ";", stringsAsFactors = FALSE)
+digiwhist_2014 <- read.csv("digiwhist_csv/data-uk-2014.csv", sep = ";", stringsAsFactors = FALSE)
+digiwhist_2015 <- read.csv("digiwhist_csv/data-uk-2015.csv", sep = ";", stringsAsFactors = FALSE)
+digiwhist_2016 <- read.csv("digiwhist_csv/data-uk-2016.csv", sep = ";", stringsAsFactors = FALSE)
+digiwhist_2017 <- read.csv("digiwhist_csv/data-uk-2017.csv", sep = ";", stringsAsFactors = FALSE)
+digiwhist_2018 <- read.csv("digiwhist_csv/data-uk-2018.csv", sep = ";", stringsAsFactors = FALSE)
+digiwhist_2019 <- read.csv("digiwhist_csv/data-uk-2019.csv", sep = ";", stringsAsFactors = FALSE)
+digiwhist_200x <- read.csv("digiwhist_csv/data-uk-200x.csv", sep = ";", stringsAsFactors = FALSE)
+
+digiwhist_all <- rbind(digiwhist_2009,
+      digiwhist_2010,
+      digiwhist_2011,
+      digiwhist_2012,
+      digiwhist_2013,
+      digiwhist_2014,
+      digiwhist_2015,
+      digiwhist_2016,
+      digiwhist_2017,
+      digiwhist_2018,
+      digiwhist_2019,
+      digiwhist_200x)
+
+rm(digiwhist_2009,
+      digiwhist_2010,
+      digiwhist_2011,
+      digiwhist_2012,
+      digiwhist_2013,
+      digiwhist_2014,
+      digiwhist_2015,
+      digiwhist_2016,
+      digiwhist_2017,
+      digiwhist_2018,
+      digiwhist_2019,
+      digiwhist_200x)
+
+
+### Pull in and Merge digiwhist data
+
+# Create unique list of names and countries
+digiwhist_all_names <- data.frame(unique(digiwhist_all[,c("bidder_name", "bidder_country")]))
+names(digiwhist_all_names) <- c("unique_bidder_name", "bidder_country")
+
+
+### Match companies in basic company file to winners
+
+# Extract names from Basic company data
+Data.company_info.names <- data.frame(Data.company_info[,c("CompanyName", "CompanyNumber")])
+
+# Remove quotes from both files
+Data.company_info.names$CompanyNameClean <- gsub('"', "", Data.company_info.names$CompanyName)
+digiwhist_all_names$clean <- gsub('"', "", digiwhist_all_names$unique_bidder_name)
+
+# Make strings lower case
+Data.company_info.names$CompanyNameClean <- tolower(Data.company_info.names$CompanyNameClean)
+digiwhist_all_names$clean <- tolower(digiwhist_all_names$clean)
+
+# Remove ltd and limited and trim
+Data.company_info.names$CompanyNameClean <- gsub(" ltd","",Data.company_info.names$CompanyNameClean)
+Data.company_info.names$CompanyNameClean <- gsub(" limited","",Data.company_info.names$CompanyNameClean)
+Data.company_info.names$CompanyNameClean <- trimws(Data.company_info.names$CompanyNameClean)
+
+digiwhist_all_names$clean <- gsub(" ltd","",digiwhist_all_names$clean)
+digiwhist_all_names$clean <- gsub(" limited","",digiwhist_all_names$clean)
+digiwhist_all_names$clean <- trimws(digiwhist_all_names$clean)
+
+# Match and check match %
+merged_all <- merge(digiwhist_all_names, Data.company_info.names, by.x = "clean", by.y = "CompanyNameClean", all.x = TRUE)
+1 - sum(is.na(merged_all$CompanyNumber))/length(merged_all$CompanyNumber)
+
+
+# Remove pvt, llp (not private since that's a real word) and trim
+Data.company_info.names$CompanyNameClean <- gsub(" llp","",Data.company_info.names$CompanyNameClean)
+Data.company_info.names$CompanyNameClean <- gsub(" pvt","",Data.company_info.names$CompanyNameClean)
+Data.company_info.names$CompanyNameClean <- trimws(Data.company_info.names$CompanyNameClean)
+
+digiwhist_all_names$clean <- gsub(" llp","",digiwhist_all_names$clean)
+digiwhist_all_names$clean <- gsub(" pvt","",digiwhist_all_names$clean)
+digiwhist_all_names$clean <- trimws(digiwhist_all_names$clean)
+
+
+# Check match % again
+merged_all <- merge(digiwhist_all_names, Data.company_info.names, by.x = "clean", by.y = "CompanyNameClean", all.x = TRUE)
+1 - sum(is.na(merged_all$CompanyNumber))/length(merged_all$CompanyNumber)
+
+# Check match % among UK bidders
+1 - sum((merged_all$bidder_country == "UK" | merged_all$bidder_country == "GB") & is.na(merged_all$CompanyNumber))/
+  sum(merged_all$bidder_country == "UK" | merged_all$bidder_country == "GB")
+
+
+# Remove any identifiers in parens or stem beginning (just for remaining) - to do if time
+
+
+## Checks on merge
+
+# Any many:1 matches? How many are unconsolidated rows (multiple company numbers across rows? Likely)
+
+# Checking rows for certain companies
+#charmatch("selfr",Data.company_info.names$CompanyNameClean)
+#Data.company_info.names[grep("selfr", Data.company_info.names$CompanyNameClean),]
+
+
+
+### Create final open tender dataset - one line per tender, with all company attributes
+
+# Identify basic data columns needed for merge
+keep.columns.company <- colnames(Data.company_info)[c(1:15, 27,33)]
+
+
+# Bring company numbers from merged file into full open tender dataset
+digiwhist_all <- merge(digiwhist_all, merged_all, by.x = "bidder_name", by.y = "unique_bidder_name", all.x = TRUE)
+
+# Bring basic data columns into open tender dataset
+merged_basic_opentender <- merge(digiwhist_all, Data.company_info[,keep.columns.company],
+                                 by.x = "CompanyNumber", by.y = "CompanyNumber", all.x = TRUE)
+
+
+
+
+
+
+
+
+####################### Merging PSC and basic companies datasets ############################
 
 json_dframe_1 <- stream_in(file("psc-snapshot-2020-04-19_1of16.txt")) #
 json_dframe_2 <- stream_in(file("psc-snapshot-2020-04-19_2of16.txt")) #
@@ -76,25 +224,10 @@ write.csv(json_all_dframe[,c(1,3,4)],"PSC_companies_ppl.csv", row.names = FALSE)
 
 
 
-################# Import the company data and merge #####################
-
-# Import file
-Data.company_info <- read.csv("BasicCompanyDataAsOneFile-2020-04-01.csv", header=TRUE)
-
-# Define columns to keep
-keep.columns.company <- colnames(Data.company_info)[c(1:33)]
-
-# Keep those columns
-Data.company_info <- Data.company_info[,keep.columns.company]
-
-
-# Checking for matches
-#Data.company_info$standardized <- tolower(noquote(Data.company_info$CompanyName))
-#Data.company_info[charmatch("apex tool solutions",Data.company_info$standardized),]
 
 
 
-############### Merge PSC and company data ######################
+########################### Merge PSC and basic company data ################################
 
 ## Merge with other data
 
@@ -126,6 +259,9 @@ rm(Data.company_info)
 write.csv(Data.PSC.merged[,c(1:5,7:10)],"PSC_Merged_Data.csv", row.names = FALSE)
 
 
+
+
+
 ########################YOU NOW HAVE A MERGED PSC FILE!!! ##################################
 
 
@@ -135,39 +271,11 @@ Data.PSC.merged <- read.csv("PSC_Merged_Data.csv")
 
 
 
-######## Examining Open Contracts Data ###################
-
-
-### Pull in and Merge digiwhist data
-
-# Start with digiwhist 2019 data - pull in whole folder later
-digiwhist_ot <- read.csv("digiwhist_open_tender.csv")
-#x <- digiwhist_ot_grouped %>% group_by(tender_id, tender_year, lot_status, bid_isWinning, bidder_id, bidder_name)
-
-
-# Reduce columns to those needed for merge (do analysis later)
-ot_columns <- colnames()
-
-# Match companies in PSC file to winners
-
-# try unedited
-Data.PSC.merged <- merge(Data.PSC.merged, digiwhist_ot, by.x = "CompanyName", by.y = "bidder_name", all.x = TRUE)
-
-
-#make all company names lowercase and match on stem
-
-
-
-### Pull in and Merge OCDS data
-
-# Did using power query - repull in power query file
-#uk_ocds_long <- read.csv("uk_ocds_long.csv", header = FALSE, sep = ",")
 
 
 
 
-
-######### Trying to analyze this data ################
+######### Trying to analyze these datasets ################
 
 
 
