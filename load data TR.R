@@ -282,9 +282,16 @@ View(merged_basic_opentender[merged_basic_opentender$bid_isWinning == "yes"
                              & merged_basic_opentender$bid_price>100000000 
                              & !is.na(merged_basic_opentender$bid_price),])
 
-# Who has won the largest bids in these records, and how large have they been?
+
+
+###### Who has won the largest bids in these records, and how large have they been?
 View(head(merged_basic_opentender[order(-merged_basic_opentender$bid_price),
                                   c("bidder_name","CompanyName.x", "bid_price")],20))
+
+###### Who has won multiple contracts?
+df <- aggregate(merged_basic_opentender$tender_id,by = list(merged_basic_opentender$bidder_name), FUN = length)
+View(head(df[order(-df$x),],20))
+
 
 
 ## What types of public contracts have been awarded in the last 10 or so years?
