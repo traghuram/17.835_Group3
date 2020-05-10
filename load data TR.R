@@ -104,7 +104,7 @@ digiwhist_all_names$clean <- trimws(digiwhist_all_names$clean)
 
 
 ### Merge and check match %
-merged_all <- merge(digiwhist_all_names, Data.company_info.names, by.x = "clean", by.y = "CompanyNameClean", all.x = TRUE)
+merged_all_names <- merge(digiwhist_all_names, Data.company_info.names, by.x = "clean", by.y = "CompanyNameClean", all.x = TRUE)
 1 - sum(is.na(merged_all$CompanyNumber))/length(merged_all$CompanyNumber)
 
 
@@ -133,7 +133,7 @@ merged_all_names <- merge(digiwhist_all_names, Data.company_info.names, by.x = "
 ## Checks on merge
 
 # Any many:1 or 1:many matches? How many are unconsolidated rows (multiple company numbers across rows? Likely)
-sum(aggregate(merged_all$unique_bidder_name, by = list(merged_all$unique_bidder_name), FUN = length)$x > 1)
+sum(aggregate(merged_all_names$unique_bidder_name, by = list(merged_all_names$unique_bidder_name), FUN = length)$x > 1)
 
 # Number of rows after merge is 300 more because there are a few bidders that match 2 or 3 unique companies
 # Need to fix that before submitting - but generally pretty good match (99.8%)! Can fix 300 by hand
@@ -160,9 +160,14 @@ merged_basic_opentender <- merge(digiwhist_all_merged, Data.company_info[,keep.c
                                  by.x = "CompanyNumber", by.y = "CompanyNumber", all.x = TRUE)
 
 
-# Add a field that is lot-tender concat
-merged_basic_opentender$concat <- paste(c(merged_basic_opentender$tender_id, merged_basic_opentender$lot_row_nr),
-                                        sep = "-")
+## Pull digiwhist into basic company file instead - COMMENT OUT IF NOT USING!
+merged_basic_opentender_reversed <- merge(Data.company_info[,keep.columns.company], digiwhist_all_merged,
+                                 by.x = "CompanyNumber", by.y = "CompanyNumber", all.x = TRUE)
+
+merged_basic_opentender_reversed$age <- 2020 - as.numeric(substring(merged_basic_opentender_reversed$IncorporationDate, 7, 10))
+merged_basic_opentender_reversed$awarded <- ifelse(merged_basic_opentender_reversed$lot_status == "AWARDED", 1, 0)
+aggregate(merged_basic_opentender_reversed$age, by = list(merged_basic_opentender_reversed$awarded), FUN = mean)
+write.csv(merged_basic_opentender_reversed, "merged_basic_opentender_reversed.csv")
 
 
 ##################### STOP HERE FOR A MERGED OPEN TENDER AND BASIC COMPANY FILE ########################
@@ -173,7 +178,7 @@ merged_basic_opentender$concat <- paste(c(merged_basic_opentender$tender_id, mer
 
 
 
-#################################### Open Tender Analysis #########################################
+#################################### Open Tender Descriptive Analysis #########################################
 
 ## Create some subsets that are useful for analysis
 
@@ -338,6 +343,64 @@ View(merged_basic_opentender[merged_basic_opentender$bid_isWinning == ""
 
 
 # Unsupervised way - LASSO or prcomp or k-means cluster of bid results and these features
+
+
+
+
+#################################### Open Tender Network Analysis #########################################
+library(igraph)
+library(tidyverse)
+
+## Create adjacency matrix of companies and public entities
+
+# Create a new dataframe of only bidders and buyers - update this to include tender ids and other info once cleaned
+columns_care <- c("bidder_name", "buyer_name", "clean")
+bidder_buyer_df <- merged_basic_opentender[,columns_care] %>%
+  group_by(bidder_name, buyer_name, clean, .drop = TRUE)
+#write.csv(bidder_buyer_df, "bidder_buyer_df.csv")
+
+# Create a subset of rows, with just two columns - update to be full dataset once this works
+bidder_buyer_df_sample <- head(bidder_buyer_df[bidder_buyer_df$buyer_name == "Northern Housing Consortium",
+                                          c("clean", "buyer_name")],100)
+
+# Create nodes
+buyers <- bidder_buyer_df_sample %>%
+  distinct(buyer_name) %>%
+  rename(label = buyer_name)
+bidders <- bidder_buyer_df_sample %>%
+  distinct(clean) %>%
+  rename(label = clean)
+nodes <- full_join(buyers, bidders, by = "label") # makes a single list of buyers and bidders (nodes)
+nodes <- nodes %>% rowid_to_column("id") # adds an id to each row
+
+# Create edges
+edges <- bidder_buyer_df_sample %>%
+  group_by(buyer_name, clean) %>%
+  summarise(weight = n()) %>%
+  ungroup()
+
+edges <- edges %>% 
+  left_join(nodes, by = c("buyer_name" = "label")) %>% 
+  rename(from = id)
+
+edges <- edges %>% 
+  left_join(nodes, by = c("clean" = "label")) %>% 
+  rename(to = id)
+
+edges_list <- edges
+edges <- select(edges, from, to, weight)
+
+
+## Plot network using igraph
+bids_igraph <- graph_from_data_frame(d = edges, vertices = nodes, directed = TRUE)
+plot(bids_igraph, edge.arrow.size = 0.2)
+plot(bids_igraph, vertex.size = degree(bids_igraph), edge.arrow.size = 0.2)
+bids_igraph
+View(edges_list)
+
+
+## Calculate network metrics based on this
+
 
 
 
