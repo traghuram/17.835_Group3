@@ -164,10 +164,10 @@ merged_basic_opentender <- merge(digiwhist_all_merged, Data.company_info[,keep.c
 merged_basic_opentender_reversed <- merge(Data.company_info[,keep.columns.company], digiwhist_all_merged,
                                  by.x = "CompanyNumber", by.y = "CompanyNumber", all.x = TRUE)
 
-merged_basic_opentender_reversed$age <- 2020 - as.numeric(substring(merged_basic_opentender_reversed$IncorporationDate, 7, 10))
-merged_basic_opentender_reversed$awarded <- ifelse(merged_basic_opentender_reversed$lot_status == "AWARDED", 1, 0)
-aggregate(merged_basic_opentender_reversed$age, by = list(merged_basic_opentender_reversed$awarded), FUN = mean)
-write.csv(merged_basic_opentender_reversed, "merged_basic_opentender_reversed.csv")
+# merged_basic_opentender_reversed$age <- 2020 - as.numeric(substring(merged_basic_opentender_reversed$IncorporationDate, 7, 10))
+# merged_basic_opentender_reversed$awarded <- ifelse(merged_basic_opentender_reversed$lot_status == "AWARDED", 1, 0)
+# aggregate(merged_basic_opentender_reversed$age, by = list(merged_basic_opentender_reversed$awarded), FUN = mean)
+# write.csv(merged_basic_opentender_reversed, "merged_basic_opentender_reversed.csv")
 
 
 ##################### STOP HERE FOR A MERGED OPEN TENDER AND BASIC COMPANY FILE ########################
@@ -187,7 +187,7 @@ write.csv(merged_basic_opentender_reversed, "merged_basic_opentender_reversed.cs
 
 # How many unique tenders?
 length(unique(merged_basic_opentender$tender_id))
-View(aggregate(merged_basic_opentender$tender_id, by = list(merged_basic_opentender$tender_id), FUN = length))
+#View(aggregate(merged_basic_opentender$tender_id, by = list(merged_basic_opentender$tender_id), FUN = length))
 
 
 # How many rows do we even have names for?
@@ -195,18 +195,29 @@ sum(is.na(merged_basic_opentender$bidder_name))
 sum(merged_basic_opentender$bidder_name == "" & !is.na(merged_basic_opentender$bidder_name))
 
 
-# 1 Tender per row - ignoring bidders
 
-
-
-
-
-
-
-## Understanding the tenders that the UK govt has put out
+### Understanding the tenders that the UK govt has put out
 
 # How many unique tenders over the last 10 years?
 length(unique(merged_basic_opentender$tender_id))
+
+## How many unique tender-price combos?
+tender_prices <- group_by(merged_basic_opentender[,c("tender_id", "tender_finalPrice")], tender_id, tender_finalPrice)
+tender_prices <- distinct(tender_prices)
+
+mean(tender_prices$tender_finalPrice, na.rm = TRUE)
+median(tender_prices$tender_finalPrice, na.rm = TRUE)
+sum(tender_prices$tender_finalPrice, na.rm = TRUE)
+
+hist(merged_basic_opentender[merged_basic_opentender$bid_isWinning == "yes"
+                             & !is.na(merged_basic_opentender$tender_finalPrice),"tender_finalPrice"],
+     main = "Histogram of tenders by price", xlab = "Tender Prices", cex = 0.5)
+
+hist(merged_basic_opentender[merged_basic_opentender$bid_isWinning == "yes"
+                             & !is.na(merged_basic_opentender$tender_finalPrice),"tender_finalPrice"],
+     main = "Histogram of tenders by price", xlab = "Tender Prices", xlim = c(0,10^5),
+     cex = 0.5, breaks = 1000000)
+
 
 # How many unique tenders by year?
 unique_tenders <- unique(merged_basic_opentender[,c("tender_id","tender_year")])
@@ -215,11 +226,61 @@ aggregate(unique_tenders$tender_id, by = list(unique_tenders$tender_year), FUN =
 # How many unique tenders that were awarded by year?
 unique_tenders_awarded <- unique(merged_basic_opentender[merged_basic_opentender$lot_status == "AWARDED"
                                                          & !is.na(merged_basic_opentender$bid_price),
-                                                         c("tender_id","tender_year", "bid_price", "lot_status")])
+                                                         c("tender_id",
+                                                           "tender_year", 
+                                                           "bid_price",
+                                                           "tender_finalPrice",
+                                                           "lot_status",
+                                                           "secrecy_bidder")])
 
+# Secrecy jurisdiction companies avg tender
+aggregate(unique_tenders_awarded[unique_tenders_awarded$secrecy_bidder == 1, "tender_finalPrice"],
+          by = list(unique_tenders_awarded[unique_tenders_awarded$secrecy_bidder == 1, "tender_year"]),
+          FUN = mean, na.rm = TRUE)
+
+# Other companies avg tender
+aggregate(unique_tenders_awarded[unique_tenders_awarded$secrecy_bidder == 0, "tender_finalPrice"],
+          by = list(unique_tenders_awarded[unique_tenders_awarded$secrecy_bidder == 0, "tender_year"]),
+          FUN = mean, na.rm = TRUE)
+
+
+
+
+### Understanding bids
+
+# How many unique tender-price combos?
+bid_prices <- group_by(merged_basic_opentender[,c("tender_id", "bid_price")], tender_id, bid_price)
+bid_prices <- distinct(bid_prices)
+
+mean(bid_prices$bid_price, na.rm = TRUE)
+median(bid_prices$bid_price, na.rm = TRUE)
+sum(bid_prices$bid_price, na.rm = TRUE)
+
+hist(merged_basic_opentender[merged_basic_opentender$bid_isWinning == "yes"
+                             & !is.na(merged_basic_opentender$bid_price),"bid_price"],
+     main = "Histogram of bids by price", xlab = "Bid Prices", cex = 0.5)
+
+hist(merged_basic_opentender[merged_basic_opentender$bid_isWinning == "yes"
+                             & !is.na(merged_basic_opentender$bid_price),"bid_price"],
+     main = "Histogram of bids by price", xlab = "Bid Prices", xlim = c(0,10^5),
+     cex = 0.5, breaks = 1000000)
+
+# Average bid by year
 aggregate(unique_tenders_awarded$bid_price, by = list(unique_tenders_awarded$tender_year), FUN = mean)
 
-# How many unique tenders that were awarded by winning bid amount?
+
+## Bid information for secrecy companies
+
+# Secrecy jurisdiction companies avg bids
+aggregate(unique_tenders_awarded[unique_tenders_awarded$secrecy_bidder == 1, "bid_price"],
+          by = list(unique_tenders_awarded[unique_tenders_awarded$secrecy_bidder == 1, "tender_year"]),
+          FUN = mean)
+
+# Other companies avg bids
+aggregate(unique_tenders_awarded[unique_tenders_awarded$secrecy_bidder == 0, "bid_price"],
+          by = list(unique_tenders_awarded[unique_tenders_awarded$secrecy_bidder == 0, "tender_year"]),
+          FUN = mean)
+
 
 
 
@@ -283,15 +344,15 @@ hist(merged_basic_opentender[merged_basic_opentender$bid_isWinning == "yes"
      cex = 0.5)
 
 # What have been the largest winning bids in these records?
-View(merged_basic_opentender[merged_basic_opentender$bid_isWinning == "yes"
-                             & merged_basic_opentender$bid_price>100000000 
-                             & !is.na(merged_basic_opentender$bid_price),])
+# View(merged_basic_opentender[merged_basic_opentender$bid_isWinning == "yes"
+#                              & merged_basic_opentender$bid_price>100000000 
+#                              & !is.na(merged_basic_opentender$bid_price),])
 
 
 
 ###### Who has won the largest bids in these records, and how large have they been?
 View(head(merged_basic_opentender[order(-merged_basic_opentender$bid_price),
-                                  c("bidder_name","CompanyName.x", "bid_price")],20))
+                                  c("bidder_name","buyer_name", "bid_price")],20))
 
 ###### Who has won multiple contracts?
 df <- aggregate(merged_basic_opentender$tender_id,by = list(merged_basic_opentender$bidder_name), FUN = length)
@@ -351,57 +412,171 @@ View(merged_basic_opentender[merged_basic_opentender$bid_isWinning == ""
 library(igraph)
 library(tidyverse)
 
-## Create adjacency matrix of companies and public entities
 
-# Create a new dataframe of only bidders and buyers - update this to include tender ids and other info once cleaned
+
+### Create a network diagram of buyers who have contracts with secrecy jurisdiction companies
+
+## Pull in list of buyers associated with companies in secrecy jurisdictions
+buyers_secrecy_raw <- read.csv("secrecy_awarded.csv", stringsAsFactors = FALSE)
+columns.to.keep <- c("secret", "company_number", "buyer_name")
+buyers_secrecy_raw <- buyers_secrecy[,columns.to.keep]
+
+
+## Tag the buyers and companies
+merged_basic_opentender$secrecy_buyer <- ifelse(merged_basic_opentender$buyer_name %in%
+                                                  buyers_secrecy$buyer_name, 1, 0)
+
+merged_basic_opentender$secrecy_bidder <- ifelse(merged_basic_opentender$CompanyNumber %in%
+                                                   buyers_secrecy$company_number, 1, 0)
+
+
+## Basic descriptive info on these secrecy bidders and their buyers
+
+# number of buyers involved in secrecy jurisdictions out of total
+num_secrecy_buyers <- dim(unique(subset(merged_basic_opentender, secrecy_buyer == 1, select = buyer_name)))[1]
+total_buyers <- length(unique(merged_basic_opentender$buyer_name))
+num_secrecy_buyers
+total_buyers
+num_secrecy_buyers/total_buyers
+
+# number and Avg value of bids for secrecy vs non-secrecy buyers - may need to change value column
+aggregate(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price), "bid_price"],
+          by = list(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price), "secrecy_buyer"]),
+          FUN = mean)
+aggregate(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price), "bid_price"],
+          by = list(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price), "secrecy_buyer"]),
+          FUN = length)
+
+# Number and value of bids as a prportion of all buyers
+total_bid_value <- sum(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price), "bid_price"])
+total_bid_value # 2 trillion euros! Should check that number somewhere
+total_bid_value_sb <- sum(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price)
+                                                  & merged_basic_opentender$secrecy_buyer == 1, "bid_price"])
+total_bid_value_sb/total_bid_value # Only 2% of buyers but 27% of bid value - HOLY SHIT
+
+# how many rows have an actual bid price?
+length(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price)
+                            & merged_basic_opentender$bid_price > 0, "tender_id"])
+
+# Among awardees?
+length(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price)
+                               & merged_basic_opentender$lot_status == "AWARDED", "tender_id"])
+
+# how many of these don't have a year?
+by_year <- merged_basic_opentender[!is.na(merged_basic_opentender$bid_price)
+                        & merged_basic_opentender$bid_price > 0,"tender_year"]
+by_year <- ifelse(is.na(by_year), "NA",by_year)
+table(by_year)
+sum(table(by_year)[1:11])/sum(table(by_year)) # 89% have a year - so I would have to drop 10% of variables
+
+
+# number of bidders involved in secrecy jurisdictions out of total
+num_secrecy_bidders <- dim(unique(subset(merged_basic_opentender, secrecy_bidder == 1, select = bidder_name)))[1]
+total_bidders <- length(unique(merged_basic_opentender$bidder_name))
+num_secrecy_bidders/total_bidders # only 0.2% of all bidders (makes sense, we saw 99.8% were in UK before)
+
+# number and Avg value of bids for secrecy vs non-secrecy bidders - may need to change value column
+aggregate(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price), "bid_price"],
+          by = list(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price), "secrecy_bidder"]),
+          FUN = mean)
+aggregate(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price), "bid_price"],
+          by = list(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price), "secrecy_bidder"]),
+          FUN = length)
+
+# Number and value of bids as a prportion of all bidders
+total_bid_value <- sum(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price), "bid_price"])
+total_bid_value # 2 trillion euros! Should check that number somewhere
+total_bid_value_sbid <- sum(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price)
+                                                  & merged_basic_opentender$secrecy_bidder == 1, "bid_price"])
+total_bid_value_sbid/total_bid_value # Only .2% of bidders and only .4% of bid value - in line
+
+
+
+## In summary, there's about 180k contracts with years since 2009, summing up to about 2T Euros
+# The buyers who awarded these contracts are big deals - they are only 2% of buyers but award more than 
+# a quarter of total public procurement funds The contracts and secrecy jurisdiction companies 
+# themselves are small enough as a proportion of all procurement spending to fall under the radar - 
+# only about .2% of companies (~400/170k) are in these jurisdictions and get .4% of procurement funds.
+# BUT it's still a potential leakage of millions of euros/pounds per year
+
+
+## Create the network of one buyer associated with companies in secrecy jurisdictions
+
+# Create a subset of rows, with just two columns
 columns_care <- c("bidder_name", "buyer_name", "clean")
-bidder_buyer_df <- merged_basic_opentender[,columns_care] %>%
+secrecy_buyer_df <- merged_basic_opentender[merged_basic_opentender$secrecy_buyer == 1,columns_care] %>%
   group_by(bidder_name, buyer_name, clean, .drop = TRUE)
 #write.csv(bidder_buyer_df, "bidder_buyer_df.csv")
 
-# Create a subset of rows, with just two columns - update to be full dataset once this works
-bidder_buyer_df_sample <- head(bidder_buyer_df[bidder_buyer_df$buyer_name == "Northern Housing Consortium",
-                                          c("clean", "buyer_name")],100)
+# Create a subset of rows, with just two columns
+# secrecy_buyer_df_sample <- secrecy_buyer_df[,c("clean", "buyer_name")]
+secrecy_buyer_df_sample <- secrecy_buyer_df[secrecy_buyer_df$buyer_name == "Healthcare Purchasing Consortium (HPC)",
+                                               c("clean", "buyer_name")]
+secrecy_buyer_df_sample <- subset(secrecy_buyer_df_sample, clean != "", drop = TRUE)
 
 # Create nodes
-buyers <- bidder_buyer_df_sample %>%
+secrecy_buyers <- secrecy_buyer_df_sample %>%
   distinct(buyer_name) %>%
   rename(label = buyer_name)
-bidders <- bidder_buyer_df_sample %>%
+secrecy_bidders <- secrecy_buyer_df_sample %>%
   distinct(clean) %>%
   rename(label = clean)
-nodes <- full_join(buyers, bidders, by = "label") # makes a single list of buyers and bidders (nodes)
-nodes <- nodes %>% rowid_to_column("id") # adds an id to each row
+secrecy_nodes <- full_join(secrecy_buyers, secrecy_bidders, by = "label") # makes a single list of buyers and bidders (nodes)
+secrecy_nodes <- secrecy_nodes %>% rowid_to_column("id") # adds an id to each row
 
 # Create edges
-edges <- bidder_buyer_df_sample %>%
+secrecy_edges <- secrecy_buyer_df_sample %>%
   group_by(buyer_name, clean) %>%
   summarise(weight = n()) %>%
   ungroup()
 
-edges <- edges %>% 
-  left_join(nodes, by = c("buyer_name" = "label")) %>% 
+secrecy_edges <- secrecy_edges %>% 
+  left_join(secrecy_nodes, by = c("buyer_name" = "label")) %>% 
   rename(from = id)
 
-edges <- edges %>% 
-  left_join(nodes, by = c("clean" = "label")) %>% 
+secrecy_edges <- secrecy_edges %>% 
+  left_join(secrecy_nodes, by = c("clean" = "label")) %>% 
   rename(to = id)
 
-edges_list <- edges
-edges <- select(edges, from, to, weight)
+secrecy_edges_list <- secrecy_edges
+
+unique_secrecy_bidders <- unique(merged_basic_opentender[,c("clean", "secrecy_bidder")])
+secrecy_edges_list <- merge(secrecy_edges_list, unique_secrecy_bidders, by = "clean", all.x = TRUE)
+secrecy_edges_list$color <- ifelse(secrecy_edges_list$secrecy_bidder == 1, "black", "light blue")
+
+secrecy_edges <- select(secrecy_edges_list, from, to, weight, color)
 
 
 ## Plot network using igraph
-bids_igraph <- graph_from_data_frame(d = edges, vertices = nodes, directed = TRUE)
-plot(bids_igraph, edge.arrow.size = 0.2)
-plot(bids_igraph, vertex.size = degree(bids_igraph), edge.arrow.size = 0.2)
-bids_igraph
-View(edges_list)
+secrecy_bids_igraph <- graph_from_data_frame(d = secrecy_edges, vertices = secrecy_nodes, directed = TRUE)
+
+#Plot and save to file
+jpeg("bids_igraph.jpg", 
+     width=6.8, height=6.8, 
+     units='in',res=600)
+plot(secrecy_bids_igraph, edge.arrow.size = 0.2, vertex.label = NA, vertex.size = 5,
+     vertex.color = secrecy_edges$color, edge.color = "grey")
+dev.off()
 
 
-## Calculate network metrics based on this
+## Create diagram of those companies with weight > 1 for same buyer
+secrecy_edges_heavy <- secrecy_edges[secrecy_edges$weight > 1,]
 
+secrecy_nodes_heavy <- merge(secrecy_nodes, secrecy_edges_heavy, by.x = "id", by.y = "to", all.x = TRUE)
+secrecy_nodes_heavy[secrecy_nodes_heavy$id == 1,"from"] <- 1
+secrecy_nodes_heavy <- subset(secrecy_nodes_heavy, from == 1, select = c("id", "label"), drop = TRUE)
 
+secrecy_bids_igraph_heavy <- graph_from_data_frame(d = secrecy_edges_heavy, vertices = secrecy_nodes_heavy,
+                                                   directed = TRUE)
+
+# Plot and save to file
+jpeg("bids_secrecy_igraph.jpg", 
+     width=6.8, height=6.8, 
+     units='in',res=600)
+plot(secrecy_bids_igraph_heavy, edge.arrow.size = 0.2, vertex.label.cex = .6, vertex.size = 5,
+     vertex.color = ifelse(secrecy_nodes_heavy$id == 55 | secrecy_nodes_heavy$id == 9, "black", "light blue"),
+     edge.color = "grey")
+dev.off()
 
 
 
