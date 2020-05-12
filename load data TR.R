@@ -41,7 +41,7 @@ digiwhist_2016 <- read.csv("digiwhist_csv/data-uk-2016.csv", sep = ";", stringsA
 digiwhist_2017 <- read.csv("digiwhist_csv/data-uk-2017.csv", sep = ";", stringsAsFactors = FALSE)
 digiwhist_2018 <- read.csv("digiwhist_csv/data-uk-2018.csv", sep = ";", stringsAsFactors = FALSE)
 digiwhist_2019 <- read.csv("digiwhist_csv/data-uk-2019.csv", sep = ";", stringsAsFactors = FALSE)
-digiwhist_200x <- read.csv("digiwhist_csv/data-uk-200x.csv", sep = ";", stringsAsFactors = FALSE)
+#digiwhist_200x <- read.csv("digiwhist_csv/data-uk-200x.csv", sep = ";", stringsAsFactors = FALSE)
 
 digiwhist_all <- rbind(digiwhist_2009,
       digiwhist_2010,
@@ -53,8 +53,8 @@ digiwhist_all <- rbind(digiwhist_2009,
       digiwhist_2016,
       digiwhist_2017,
       digiwhist_2018,
-      digiwhist_2019,
-      digiwhist_200x)
+      digiwhist_2019)
+#     ,digiwhist_200x)
 
 rm(digiwhist_2009,
       digiwhist_2010,
@@ -66,8 +66,8 @@ rm(digiwhist_2009,
       digiwhist_2016,
       digiwhist_2017,
       digiwhist_2018,
-      digiwhist_2019,
-      digiwhist_200x)
+      digiwhist_2019)
+#     ,digiwhist_200x)
 
 
 ### Pull in and Merge digiwhist data
@@ -104,8 +104,9 @@ digiwhist_all_names$clean <- trimws(digiwhist_all_names$clean)
 
 
 ### Merge and check match %
-merged_all_names <- merge(digiwhist_all_names, Data.company_info.names, by.x = "clean", by.y = "CompanyNameClean", all.x = TRUE)
-1 - sum(is.na(merged_all$CompanyNumber))/length(merged_all$CompanyNumber)
+merged_all_names <- merge(digiwhist_all_names, Data.company_info.names,
+                          by.x = "clean", by.y = "CompanyNameClean", all.x = TRUE)
+1 - sum(is.na(digiwhist_all_names$CompanyNumber))/length(digiwhist_all_names$CompanyNumber)
 
 
 
@@ -160,9 +161,23 @@ merged_basic_opentender <- merge(digiwhist_all_merged, Data.company_info[,keep.c
                                  by.x = "CompanyNumber", by.y = "CompanyNumber", all.x = TRUE)
 
 
+## Pull in list of buyers associated with companies in secrecy jurisdictions
+buyers_secrecy_raw <- read.csv("secrecy_awarded.csv", stringsAsFactors = FALSE)
+columns.to.keep <- c("secret", "company_number", "buyer_name")
+buyers_secrecy <- buyers_secrecy_raw[,columns.to.keep]
+
+
+## Tag the buyers and companies
+merged_basic_opentender$secrecy_buyer <- ifelse(merged_basic_opentender$buyer_name %in%
+                                                  buyers_secrecy$buyer_name, 1, 0)
+
+merged_basic_opentender$secrecy_bidder <- ifelse(merged_basic_opentender$CompanyNumber %in%
+                                                   buyers_secrecy$company_number, 1, 0)
+
+
 ## Pull digiwhist into basic company file instead - COMMENT OUT IF NOT USING!
-merged_basic_opentender_reversed <- merge(Data.company_info[,keep.columns.company], digiwhist_all_merged,
-                                 by.x = "CompanyNumber", by.y = "CompanyNumber", all.x = TRUE)
+# merged_basic_opentender_reversed <- merge(Data.company_info[,keep.columns.company], digiwhist_all_merged,
+#                                  by.x = "CompanyNumber", by.y = "CompanyNumber", all.x = TRUE)
 
 # merged_basic_opentender_reversed$age <- 2020 - as.numeric(substring(merged_basic_opentender_reversed$IncorporationDate, 7, 10))
 # merged_basic_opentender_reversed$awarded <- ifelse(merged_basic_opentender_reversed$lot_status == "AWARDED", 1, 0)
@@ -202,7 +217,8 @@ sum(merged_basic_opentender$bidder_name == "" & !is.na(merged_basic_opentender$b
 length(unique(merged_basic_opentender$tender_id))
 
 ## How many unique tender-price combos?
-tender_prices <- group_by(merged_basic_opentender[,c("tender_id", "tender_finalPrice")], tender_id, tender_finalPrice)
+tender_prices <- group_by(merged_basic_opentender[,c("tender_id", "tender_year", "tender_finalPrice")],
+                          tender_id, tender_year, tender_finalPrice)
 tender_prices <- distinct(tender_prices)
 
 mean(tender_prices$tender_finalPrice, na.rm = TRUE)
@@ -211,17 +227,17 @@ sum(tender_prices$tender_finalPrice, na.rm = TRUE)
 
 hist(merged_basic_opentender[merged_basic_opentender$bid_isWinning == "yes"
                              & !is.na(merged_basic_opentender$tender_finalPrice),"tender_finalPrice"],
-     main = "Histogram of tenders by price", xlab = "Tender Prices", cex = 0.5)
+     main = "Tenders won by price", xlab = "Tender Prices (British Pounds)", cex = 0.5)
 
 hist(merged_basic_opentender[merged_basic_opentender$bid_isWinning == "yes"
                              & !is.na(merged_basic_opentender$tender_finalPrice),"tender_finalPrice"],
-     main = "Histogram of tenders by price", xlab = "Tender Prices", xlim = c(0,10^5),
+     main = "Tenders won by price", xlab = "Tender Prices (British Pounds)", xlim = c(0,10^5),
      cex = 0.5, breaks = 1000000)
 
 
-# How many unique tenders by year?
-unique_tenders <- unique(merged_basic_opentender[,c("tender_id","tender_year")])
-aggregate(unique_tenders$tender_id, by = list(unique_tenders$tender_year), FUN = length)
+# How many unique tenders by year and how much value?
+aggregate(tender_prices$tender_id, by = list(tender_prices$tender_year), FUN = length)
+aggregate(tender_prices$tender_finalPrice, by = list(tender_prices$tender_year), FUN = sum, na.rm = TRUE)
 
 # How many unique tenders that were awarded by year?
 unique_tenders_awarded <- unique(merged_basic_opentender[merged_basic_opentender$lot_status == "AWARDED"
@@ -243,7 +259,8 @@ aggregate(unique_tenders_awarded[unique_tenders_awarded$secrecy_bidder == 0, "te
           by = list(unique_tenders_awarded[unique_tenders_awarded$secrecy_bidder == 0, "tender_year"]),
           FUN = mean, na.rm = TRUE)
 
-
+# Some evidence that in more recent years, companies from secrecy jurisdictions are getting more 
+# lucrative contracts (about twice as valuable)
 
 
 ### Understanding bids
@@ -255,6 +272,8 @@ bid_prices <- distinct(bid_prices)
 mean(bid_prices$bid_price, na.rm = TRUE)
 median(bid_prices$bid_price, na.rm = TRUE)
 sum(bid_prices$bid_price, na.rm = TRUE)
+
+aggregate(merged_basic_opentender$bid_price, by = list(merged_basic_opentender$tender_year), FUN = sum, na.rm = TRUE)
 
 hist(merged_basic_opentender[merged_basic_opentender$bid_isWinning == "yes"
                              & !is.na(merged_basic_opentender$bid_price),"bid_price"],
@@ -351,12 +370,12 @@ hist(merged_basic_opentender[merged_basic_opentender$bid_isWinning == "yes"
 
 
 ###### Who has won the largest bids in these records, and how large have they been?
-View(head(merged_basic_opentender[order(-merged_basic_opentender$bid_price),
-                                  c("bidder_name","buyer_name", "bid_price")],20))
+head(merged_basic_opentender[order(-merged_basic_opentender$bid_price),
+                                  c("bidder_name","buyer_name", "bid_price")],20)
 
 ###### Who has won multiple contracts?
 df <- aggregate(merged_basic_opentender$tender_id,by = list(merged_basic_opentender$bidder_name), FUN = length)
-View(head(df[order(-df$x),],20))
+head(df[order(-df$x),],20)
 
 
 
@@ -389,8 +408,8 @@ aggregate(merged_basic_opentender$lot_status,
           by = list(merged_basic_opentender$lot_status, merged_basic_opentender$bid_isWinning),
           FUN = length)
 
-View(merged_basic_opentender[merged_basic_opentender$bid_isWinning == "" 
-                             & merged_basic_opentender$lot_status == "AWARDED",])
+# View(merged_basic_opentender[merged_basic_opentender$bid_isWinning == "" 
+#                              & merged_basic_opentender$lot_status == "AWARDED",])
 
 # Very few... Does it make sense to try and compare given it's overwhelmingly stacked towards winning bids?
 
@@ -416,20 +435,6 @@ library(tidyverse)
 
 ### Create a network diagram of buyers who have contracts with secrecy jurisdiction companies
 
-## Pull in list of buyers associated with companies in secrecy jurisdictions
-buyers_secrecy_raw <- read.csv("secrecy_awarded.csv", stringsAsFactors = FALSE)
-columns.to.keep <- c("secret", "company_number", "buyer_name")
-buyers_secrecy_raw <- buyers_secrecy[,columns.to.keep]
-
-
-## Tag the buyers and companies
-merged_basic_opentender$secrecy_buyer <- ifelse(merged_basic_opentender$buyer_name %in%
-                                                  buyers_secrecy$buyer_name, 1, 0)
-
-merged_basic_opentender$secrecy_bidder <- ifelse(merged_basic_opentender$CompanyNumber %in%
-                                                   buyers_secrecy$company_number, 1, 0)
-
-
 ## Basic descriptive info on these secrecy bidders and their buyers
 
 # number of buyers involved in secrecy jurisdictions out of total
@@ -447,12 +452,19 @@ aggregate(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price), "bi
           by = list(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price), "secrecy_buyer"]),
           FUN = length)
 
-# Number and value of bids as a prportion of all buyers
-total_bid_value <- sum(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price), "bid_price"])
-total_bid_value # 2 trillion euros! Should check that number somewhere
-total_bid_value_sb <- sum(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price)
-                                                  & merged_basic_opentender$secrecy_buyer == 1, "bid_price"])
-total_bid_value_sb/total_bid_value # Only 2% of buyers but 27% of bid value - HOLY SHIT
+# Number and value of tenders as a prportion of all buyers
+total_tender_value <- sum(merged_basic_opentender[!is.na(merged_basic_opentender$tender_finalPrice), "tender_finalPrice"])
+total_tender_value # 2 trillion euros! Should check that number somewhere
+total_tender_value_sb <- sum(merged_basic_opentender[!is.na(merged_basic_opentender$tender_finalPrice)
+                                                  & merged_basic_opentender$secrecy_buyer == 1, "tender_finalPrice"])
+total_tender_value_sb/total_tender_value # Only 2% of buyers but 27% of bid value - HOLY SHIT
+
+# Plot % of tender value and % of all buyers
+barplot(c(num_secrecy_buyers/total_buyers, total_tender_value_sb/total_tender_value),
+        names.arg = c("Number of Buyers", "Tender Value"),
+        main = "Buyers Associated with Suppliers in Secrecy Jurisdictions",
+        ylab = "Proportion of All UK Govt Buyers and Tenders", ylim = c(0,1))
+
 
 # how many rows have an actual bid price?
 length(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price)
@@ -482,14 +494,23 @@ aggregate(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price), "bi
 aggregate(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price), "bid_price"],
           by = list(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price), "secrecy_bidder"]),
           FUN = length)
+aggregate(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price), "bid_price"],
+          by = list(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price), "secrecy_bidder"]),
+          FUN = sum)
 
 # Number and value of bids as a prportion of all bidders
 total_bid_value <- sum(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price), "bid_price"])
 total_bid_value # 2 trillion euros! Should check that number somewhere
 total_bid_value_sbid <- sum(merged_basic_opentender[!is.na(merged_basic_opentender$bid_price)
                                                   & merged_basic_opentender$secrecy_bidder == 1, "bid_price"])
-total_bid_value_sbid/total_bid_value # Only .2% of bidders and only .4% of bid value - in line
+total_bid_value_sbid/total_bid_value # Only .27% of bidders and only .35% of bid value - in line
 
+
+# Plot % of tender value and % of all buyers
+barplot(c(num_secrecy_bidders/total_bidders, total_bid_value_sbid/total_bid_value),
+        names.arg = c("Percent of All Bidders", "Percent of All Bid Value"),
+        main = "Suppliers in Secrecy Jurisdictions",
+        ylab = "Percent of All Supplies to UK Govt", ylim = c(0,.01))
 
 
 ## In summary, there's about 180k contracts with years since 2009, summing up to about 2T Euros
@@ -551,12 +572,12 @@ secrecy_edges <- select(secrecy_edges_list, from, to, weight, color)
 secrecy_bids_igraph <- graph_from_data_frame(d = secrecy_edges, vertices = secrecy_nodes, directed = TRUE)
 
 #Plot and save to file
-jpeg("bids_igraph.jpg", 
-     width=6.8, height=6.8, 
-     units='in',res=600)
+# jpeg("bids_igraph.jpg", 
+#      width=6.8, height=6.8, 
+#      units='in',res=600)
 plot(secrecy_bids_igraph, edge.arrow.size = 0.2, vertex.label = NA, vertex.size = 5,
      vertex.color = secrecy_edges$color, edge.color = "grey")
-dev.off()
+# dev.off()
 
 
 ## Create diagram of those companies with weight > 1 for same buyer
@@ -570,193 +591,198 @@ secrecy_bids_igraph_heavy <- graph_from_data_frame(d = secrecy_edges_heavy, vert
                                                    directed = TRUE)
 
 # Plot and save to file
-jpeg("bids_secrecy_igraph.jpg", 
-     width=6.8, height=6.8, 
-     units='in',res=600)
+# jpeg("bids_secrecy_igraph.jpg", 
+#      width=6.8, height=6.8, 
+#      units='in',res=600)
 plot(secrecy_bids_igraph_heavy, edge.arrow.size = 0.2, vertex.label.cex = .6, vertex.size = 5,
-     vertex.color = ifelse(secrecy_nodes_heavy$id == 55 | secrecy_nodes_heavy$id == 9, "black", "light blue"),
+     vertex.color = ifelse(secrecy_nodes_heavy$id == 44 | secrecy_nodes_heavy$id == 8, "black", "light blue"),
      edge.color = "grey")
-dev.off()
-
-
-
-
-####################### Reading in PSC dataset ############################
-
-json_dframe_1 <- stream_in(file("psc-snapshot-2020-04-19_1of16.txt")) #
-json_dframe_2 <- stream_in(file("psc-snapshot-2020-04-19_2of16.txt")) #
-json_dframe_3 <- stream_in(file("psc-snapshot-2020-04-19_3of16.txt")) #
-json_dframe_4 <- stream_in(file("psc-snapshot-2020-04-19_4of16.txt")) #
-json_dframe_5 <- stream_in(file("psc-snapshot-2020-04-19_5of16.txt")) #
-json_dframe_6 <- stream_in(file("psc-snapshot-2020-04-19_6of16.txt")) #
-json_dframe_7 <- stream_in(file("psc-snapshot-2020-04-19_7of16.txt")) #
-json_dframe_8 <- stream_in(file("psc-snapshot-2020-04-19_8of16.txt")) #
-json_dframe_9 <- stream_in(file("psc-snapshot-2020-04-19_9of16.txt")) #
-json_dframe_10 <- stream_in(file("psc-snapshot-2020-04-19_10of16.txt")) #
-json_dframe_11 <- stream_in(file("psc-snapshot-2020-04-19_11of16.txt")) #
-json_dframe_12 <- stream_in(file("psc-snapshot-2020-04-19_12of16.txt")) #
-json_dframe_13 <- stream_in(file("psc-snapshot-2020-04-19_13of16.txt")) #
-json_dframe_14 <- stream_in(file("psc-snapshot-2020-04-19_14of16.txt")) #
-json_dframe_15 <- stream_in(file("psc-snapshot-2020-04-19_15of16.txt")) #
-json_dframe_16 <- stream_in(file("psc-snapshot-2020-04-19_16of16.txt")) #
-
-# Flatten the JSON files
-json_dframe_1 <- flatten(json_dframe_1, recursive = T)
-json_dframe_2 <- flatten(json_dframe_2, recursive = T)
-json_dframe_3 <- flatten(json_dframe_3, recursive = T)
-json_dframe_4 <- flatten(json_dframe_4, recursive = T)
-json_dframe_5 <- flatten(json_dframe_5, recursive = T)
-json_dframe_6 <- flatten(json_dframe_6, recursive = T)
-json_dframe_7 <- flatten(json_dframe_7, recursive = T)
-json_dframe_8 <- flatten(json_dframe_8, recursive = T)
-json_dframe_9 <- flatten(json_dframe_9, recursive = T)
-json_dframe_10 <- flatten(json_dframe_10, recursive = T)
-json_dframe_11 <- flatten(json_dframe_11, recursive = T)
-json_dframe_12 <- flatten(json_dframe_12, recursive = T)
-json_dframe_13 <- flatten(json_dframe_13, recursive = T)
-json_dframe_14 <- flatten(json_dframe_14, recursive = T)
-json_dframe_15 <- flatten(json_dframe_15, recursive = T)
-json_dframe_16 <- flatten(json_dframe_16, recursive = T)
-
-
-# Choose columns to retain in merge and Add non-existent columns to 16th file
-keep.columns <- colnames(json_dframe_1)[c(1,3,5:8, 10:17,19:20, 23:25)]
-
-json_dframe_16[keep.columns] <- NA
-
-# Bind dataframes together
-json_all_dframe <- rbind(json_dframe_1[,keep.columns],json_dframe_2[,keep.columns])
-json_all_dframe <- rbind(json_all_dframe[,keep.columns],json_dframe_3[,keep.columns])
-json_all_dframe <- rbind(json_all_dframe[,keep.columns],json_dframe_4[,keep.columns])
-json_all_dframe <- rbind(json_all_dframe[,keep.columns],json_dframe_5[,keep.columns])
-json_all_dframe <- rbind(json_all_dframe[,keep.columns],json_dframe_6[,keep.columns])
-json_all_dframe <- rbind(json_all_dframe[,keep.columns],json_dframe_7[,keep.columns])
-json_all_dframe <- rbind(json_all_dframe[,keep.columns],json_dframe_8[,keep.columns])
-json_all_dframe <- rbind(json_all_dframe[,keep.columns],json_dframe_9[,keep.columns])
-json_all_dframe <- rbind(json_all_dframe[,keep.columns],json_dframe_10[,keep.columns])
-json_all_dframe <- rbind(json_all_dframe[,keep.columns],json_dframe_11[,keep.columns])
-json_all_dframe <- rbind(json_all_dframe[,keep.columns],json_dframe_12[,keep.columns])
-json_all_dframe <- rbind(json_all_dframe[,keep.columns],json_dframe_13[,keep.columns])
-json_all_dframe <- rbind(json_all_dframe[,keep.columns],json_dframe_14[,keep.columns])
-json_all_dframe <- rbind(json_all_dframe[,keep.columns],json_dframe_15[,keep.columns])
-json_all_dframe <- rbind(json_all_dframe[,keep.columns],json_dframe_16[,keep.columns])
-
-# Remove individual dataframes
-rm(list=rm(list = ls(pattern = "^json_dframe")))
-
-# Export a list of company numbers and names to have for later
-write.csv(json_all_dframe[,c(1,3,4)],"PSC_companies_ppl.csv", row.names = FALSE)
-
-
-
-
-########################### Merge PSC and basic company data ################################
-
-## Merge with other data
-
-# Set seed to make partition reproducable
-# set.seed(02139)
-
-# Create a list of sample rows and test merge
-# test_rows <- sample(nrow(json_all_dframe), 1000, replace = FALSE)
-# test <- merge(json_all_dframe[test_rows,], Data.company_info, by.x = "company_number", by.y = "CompanyNumber")
-# View(head(test))
-# rm(test)
-
-
-## Just Merge a few columns
-Data.company_info <- Data.company_info[,c(1,2,9,27)]
-json_all_dframe <- json_all_dframe[,c(1:6, 16)]
-
-
-# Actual merge
-Data.PSC.merged <- merge(json_all_dframe, Data.company_info, by.x = "company_number", by.y = "CompanyNumber", all.x = TRUE)
-# Note - this does not pull in PSCs for companies not in the companies file - not enough memory for operation
-
-
-# Remove the excess files
-rm(json_all_dframe)
-rm(Data.company_info)
-
-## Export a file for later
-write.csv(Data.PSC.merged[,c(1:5,7:10)],"PSC_Merged_Data.csv", row.names = FALSE)
-
-
-
-
-
-########################YOU NOW HAVE A MERGED PSC FILE!!! ##################################
-
-
-### Cheat for next few steps - just pull in the PSC merged csv from your computer and skip the above
-
-Data.PSC.merged <- read.csv("PSC_Merged_Data.csv")
-
-
-
-
-
-
-
-######### Analyze merged PSC data ################
-
-
-## Check - how many companies in free product but not in PSC file?
-
-
-### Stats on merged dataset
-
-## Counts of rows
-
-# How many unique company ids in orignial dataset?
-PSC.unique_companies <- length(unique(json_all_dframe$company_number))
-
-# How many unique company ids in merged dataset?
-Product.unique_companies <- length(unique(Data.company_info$CompanyNumber))
-
-# How many companies matched to PSC file? - about 77% of PSC-company rows
-Product.unique_companies/PSC.unique_companies
-
-
-## Anything specific about the companies that didn't match that might matter?
-
-# Create a crosswalk of country names
-#write.csv(table(Data.company_info$RegAddress.Country), "country crosswalk companies.csv")
-table(Data.company_info$RegAddress.Country)
-# At least 99.8% of countries are registered within the UK - but there are some that are not
-
-# Locations of companies in original PSC data
-head(table(json_all_dframe$data.address.country))
-
-# Locations of companies in merged file
-
-
-
-## Distribution of companies
-
-# How many PSC rows are people vs other entities?
-100*table(json_all_dframe$data.kind)/length(json_all_dframe$company_number)
-
-# How many merged rows are people vs other entities?
-100*table(Data.PSC.merged$data.kind)/length(Data.PSC.merged$company_number)
-
-
-## Industries of companies
-
-# How many companies are there for each of the industry designations?
-#length(unique(Data.PSC.merged[,c("SICCode.SicText_1", "company_number")]))
-
-# list of unique industry codes in file
-length(unique(Data.PSC.merged$SICCode.SicText_1))
-length(unique(Data.PSC.merged$company_number))
-length(unique(Data.company_info$CompanyNumber)) # There are some companies not in PSC file (~300k)
-
-table.industry_code <- table(Data.PSC.merged$SICCode.SicText_1)/length(Data.PSC.merged$company_number)
-# Figure out how to sort this table
-
-# There are 1180 unique industry codes in the data file
-# The top 40 industries make up 60% of company-person rows in the file (other 1140 make up 40%)
-# Some of the top industries are unknown or vague ("Other business support", "Dormany Company", etc...)
+# dev.off()
+
+
+
+
+
+
+### NOTE: The code below is redundant given Rasim and Leonie's other work - commenting out,
+# but keeping for posterity
+# 
+# ####################### Reading in PSC dataset ############################
+# 
+# json_dframe_1 <- stream_in(file("psc-snapshot-2020-04-19_1of16.txt")) #
+# json_dframe_2 <- stream_in(file("psc-snapshot-2020-04-19_2of16.txt")) #
+# json_dframe_3 <- stream_in(file("psc-snapshot-2020-04-19_3of16.txt")) #
+# json_dframe_4 <- stream_in(file("psc-snapshot-2020-04-19_4of16.txt")) #
+# json_dframe_5 <- stream_in(file("psc-snapshot-2020-04-19_5of16.txt")) #
+# json_dframe_6 <- stream_in(file("psc-snapshot-2020-04-19_6of16.txt")) #
+# json_dframe_7 <- stream_in(file("psc-snapshot-2020-04-19_7of16.txt")) #
+# json_dframe_8 <- stream_in(file("psc-snapshot-2020-04-19_8of16.txt")) #
+# json_dframe_9 <- stream_in(file("psc-snapshot-2020-04-19_9of16.txt")) #
+# json_dframe_10 <- stream_in(file("psc-snapshot-2020-04-19_10of16.txt")) #
+# json_dframe_11 <- stream_in(file("psc-snapshot-2020-04-19_11of16.txt")) #
+# json_dframe_12 <- stream_in(file("psc-snapshot-2020-04-19_12of16.txt")) #
+# json_dframe_13 <- stream_in(file("psc-snapshot-2020-04-19_13of16.txt")) #
+# json_dframe_14 <- stream_in(file("psc-snapshot-2020-04-19_14of16.txt")) #
+# json_dframe_15 <- stream_in(file("psc-snapshot-2020-04-19_15of16.txt")) #
+# json_dframe_16 <- stream_in(file("psc-snapshot-2020-04-19_16of16.txt")) #
+# 
+# # Flatten the JSON files
+# json_dframe_1 <- flatten(json_dframe_1, recursive = T)
+# json_dframe_2 <- flatten(json_dframe_2, recursive = T)
+# json_dframe_3 <- flatten(json_dframe_3, recursive = T)
+# json_dframe_4 <- flatten(json_dframe_4, recursive = T)
+# json_dframe_5 <- flatten(json_dframe_5, recursive = T)
+# json_dframe_6 <- flatten(json_dframe_6, recursive = T)
+# json_dframe_7 <- flatten(json_dframe_7, recursive = T)
+# json_dframe_8 <- flatten(json_dframe_8, recursive = T)
+# json_dframe_9 <- flatten(json_dframe_9, recursive = T)
+# json_dframe_10 <- flatten(json_dframe_10, recursive = T)
+# json_dframe_11 <- flatten(json_dframe_11, recursive = T)
+# json_dframe_12 <- flatten(json_dframe_12, recursive = T)
+# json_dframe_13 <- flatten(json_dframe_13, recursive = T)
+# json_dframe_14 <- flatten(json_dframe_14, recursive = T)
+# json_dframe_15 <- flatten(json_dframe_15, recursive = T)
+# json_dframe_16 <- flatten(json_dframe_16, recursive = T)
+# 
+# 
+# # Choose columns to retain in merge and Add non-existent columns to 16th file
+# keep.columns <- colnames(json_dframe_1)[c(1,3,5:8, 10:17,19:20, 23:25)]
+# 
+# json_dframe_16[keep.columns] <- NA
+# 
+# # Bind dataframes together
+# json_all_dframe <- rbind(json_dframe_1[,keep.columns],json_dframe_2[,keep.columns])
+# json_all_dframe <- rbind(json_all_dframe[,keep.columns],json_dframe_3[,keep.columns])
+# json_all_dframe <- rbind(json_all_dframe[,keep.columns],json_dframe_4[,keep.columns])
+# json_all_dframe <- rbind(json_all_dframe[,keep.columns],json_dframe_5[,keep.columns])
+# json_all_dframe <- rbind(json_all_dframe[,keep.columns],json_dframe_6[,keep.columns])
+# json_all_dframe <- rbind(json_all_dframe[,keep.columns],json_dframe_7[,keep.columns])
+# json_all_dframe <- rbind(json_all_dframe[,keep.columns],json_dframe_8[,keep.columns])
+# json_all_dframe <- rbind(json_all_dframe[,keep.columns],json_dframe_9[,keep.columns])
+# json_all_dframe <- rbind(json_all_dframe[,keep.columns],json_dframe_10[,keep.columns])
+# json_all_dframe <- rbind(json_all_dframe[,keep.columns],json_dframe_11[,keep.columns])
+# json_all_dframe <- rbind(json_all_dframe[,keep.columns],json_dframe_12[,keep.columns])
+# json_all_dframe <- rbind(json_all_dframe[,keep.columns],json_dframe_13[,keep.columns])
+# json_all_dframe <- rbind(json_all_dframe[,keep.columns],json_dframe_14[,keep.columns])
+# json_all_dframe <- rbind(json_all_dframe[,keep.columns],json_dframe_15[,keep.columns])
+# json_all_dframe <- rbind(json_all_dframe[,keep.columns],json_dframe_16[,keep.columns])
+# 
+# # Remove individual dataframes
+# rm(list=rm(list = ls(pattern = "^json_dframe")))
+# 
+# # Export a list of company numbers and names to have for later
+# write.csv(json_all_dframe[,c(1,3,4)],"PSC_companies_ppl.csv", row.names = FALSE)
+# 
+# 
+# 
+# 
+# ########################### Merge PSC and basic company data ################################
+# 
+# ## Merge with other data
+# 
+# # Set seed to make partition reproducable
+# # set.seed(02139)
+# 
+# # Create a list of sample rows and test merge
+# # test_rows <- sample(nrow(json_all_dframe), 1000, replace = FALSE)
+# # test <- merge(json_all_dframe[test_rows,], Data.company_info, by.x = "company_number", by.y = "CompanyNumber")
+# # View(head(test))
+# # rm(test)
+# 
+# 
+# ## Just Merge a few columns
+# Data.company_info <- Data.company_info[,c(1,2,9,27)]
+# json_all_dframe <- json_all_dframe[,c(1:6, 16)]
+# 
+# 
+# # Actual merge
+# Data.PSC.merged <- merge(json_all_dframe, Data.company_info, by.x = "company_number", by.y = "CompanyNumber", all.x = TRUE)
+# # Note - this does not pull in PSCs for companies not in the companies file - not enough memory for operation
+# 
+# 
+# # Remove the excess files
+# rm(json_all_dframe)
+# rm(Data.company_info)
+# 
+# ## Export a file for later
+# write.csv(Data.PSC.merged[,c(1:5,7:10)],"PSC_Merged_Data.csv", row.names = FALSE)
+# 
+# 
+# 
+# 
+# 
+# ########################YOU NOW HAVE A MERGED PSC FILE!!! ##################################
+# 
+# 
+# ### Cheat for next few steps - just pull in the PSC merged csv from your computer and skip the above
+# 
+# Data.PSC.merged <- read.csv("PSC_Merged_Data.csv")
+# 
+# 
+# 
+# 
+# 
+# 
+# 
+# ######### Analyze merged PSC data ################
+# 
+# 
+# ## Check - how many companies in free product but not in PSC file?
+# 
+# 
+# ### Stats on merged dataset
+# 
+# ## Counts of rows
+# 
+# # How many unique company ids in orignial dataset?
+# PSC.unique_companies <- length(unique(json_all_dframe$company_number))
+# 
+# # How many unique company ids in merged dataset?
+# Product.unique_companies <- length(unique(Data.company_info$CompanyNumber))
+# 
+# # How many companies matched to PSC file? - about 77% of PSC-company rows
+# Product.unique_companies/PSC.unique_companies
+# 
+# 
+# ## Anything specific about the companies that didn't match that might matter?
+# 
+# # Create a crosswalk of country names
+# #write.csv(table(Data.company_info$RegAddress.Country), "country crosswalk companies.csv")
+# table(Data.company_info$RegAddress.Country)
+# # At least 99.8% of countries are registered within the UK - but there are some that are not
+# 
+# # Locations of companies in original PSC data
+# head(table(json_all_dframe$data.address.country))
+# 
+# # Locations of companies in merged file
+# 
+# 
+# 
+# ## Distribution of companies
+# 
+# # How many PSC rows are people vs other entities?
+# 100*table(json_all_dframe$data.kind)/length(json_all_dframe$company_number)
+# 
+# # How many merged rows are people vs other entities?
+# 100*table(Data.PSC.merged$data.kind)/length(Data.PSC.merged$company_number)
+# 
+# 
+# ## Industries of companies
+# 
+# # How many companies are there for each of the industry designations?
+# #length(unique(Data.PSC.merged[,c("SICCode.SicText_1", "company_number")]))
+# 
+# # list of unique industry codes in file
+# length(unique(Data.PSC.merged$SICCode.SicText_1))
+# length(unique(Data.PSC.merged$company_number))
+# length(unique(Data.company_info$CompanyNumber)) # There are some companies not in PSC file (~300k)
+# 
+# table.industry_code <- table(Data.PSC.merged$SICCode.SicText_1)/length(Data.PSC.merged$company_number)
+# # Figure out how to sort this table
+# 
+# # There are 1180 unique industry codes in the data file
+# # The top 40 industries make up 60% of company-person rows in the file (other 1140 make up 40%)
+# # Some of the top industries are unknown or vague ("Other business support", "Dormany Company", etc...)
 
 
 
